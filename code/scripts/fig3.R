@@ -21,6 +21,12 @@ sp_names <- paste("x", 1:n_sp, sep = "")
 pert_sampling <- "uniform"
 # times to store analytical results
 select_times <- times_pert[floor(seq(11, length(times_pert), length = sample_size))]
+# factor to multiply time_step (set to 500 to test for a large time step, Fig. SX)
+time_step_factor <- 1
+# alternative select times
+if (time_step_factor > 1) {
+  select_times <- times_pert[seq(from = time_step_factor, to = n_points, by = time_step_factor) + 1]
+}
 # color palettes
 palette_1 <- c(brewer.pal(9, "Blues")[8], brewer.pal(9, "YlOrRd")[4], 
                brewer.pal(9, "Reds")[8])
@@ -107,8 +113,8 @@ ts_sub_sub$time_plot <- as.factor(round(ts_sub_sub$time, 0))
 if (n_sp == 2) {
   fig <- ggplot() +
     geom_path(data = ts, aes(x = x1, y = x2), size = 1.5, color = "gray70") +
-    geom_point(data = ts_sub_sub, aes(x = x1, y = x2), 
-               size = 15, shape = 21, fill = palette_2) +
+    geom_point(data = ts_sub_sub[c(1, 3), ], aes(x = x1, y = x2), 
+               size = 15, shape = 21, fill = palette_2[c(1, 3)]) +
     xlab(latex2exp::TeX("Resource abundance ($N_1$)")) +
     ylab(latex2exp::TeX("Consumer abundance ($N_2$)")) +
     scale_x_continuous(limits = lim_x1) +
@@ -139,7 +145,7 @@ if (n_sp == 3) {
                  colors = palette_ordered) %>% 
     add_trace(data = ts, type = 'scatter3d', mode = "lines",
               color = I('gray70'), line = list(width = 7)) %>% 
-    add_markers(data = ts_sub_sub, type = 'scatter3d', marker = list(size = 26, line = list(color = "black", width = 1)),
+    add_markers(data = ts_sub_sub[c(1, 3), ], type = 'scatter3d', marker = list(size = 26, line = list(color = "black", width = 1)),
                 color = ~time_plot) %>% 
     layout(scene = list(xaxis = list(title = "",
                                      titlefont = list(size = 26, 
@@ -249,8 +255,8 @@ for (i in 1:length(time_ids)) {
   expect_avg_size <- c()
   expect_avg_growth_rate <- c()
   for (j in 1:length(select_times)) {
-    J_curr <- J[sprintf("%.5f", seq(curr_time, (curr_time + select_times[j]), by = time_step))]
-    Phi <- Reduce("%*%", rev(lapply(J_curr, function(A) expm(time_step * A))))
+    J_curr <- J[sprintf("%.5f", seq(curr_time, (curr_time + select_times[j]), by = time_step * time_step_factor))]
+    Phi <- Reduce("%*%", rev(lapply(J_curr, function(A) expm(time_step * time_step_factor * A))))
     singular_phi <- svd(Phi)$d
     min_growth_rate[j] <- log(min(singular_phi)) / select_times[j]
     max_growth_rate[j] <- log(max(singular_phi)) / select_times[j]
