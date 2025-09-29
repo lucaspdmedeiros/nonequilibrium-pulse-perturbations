@@ -18,6 +18,11 @@ if (!require(gifski)) {install.packages("gifski"); library(gifski)}
 if (!require(plotly)) {install.packages("plotly"); library(plotly)}
 if (!require(latex2exp)) {install.packages("latex2exp"); library(latex2exp)}
 if (!require(RColorBrewer)) {install.packages("RColorBrewer"); library(RColorBrewer)}
+if (!require(diffeqr)) {install.packages("diffeqr"); library(diffeqr)}
+if (!require(JuliaCall)) {install.packages("JuliaCall"); library(JuliaCall)}
+if (!require(pbapply)) {install.packages("pbapply"); library(pbapply)}
+if (!require(glmnet)) {install.packages("glmnet"); library(glmnet)}
+if (!require(mvtnorm)) {install.packages("mvtnorm"); library(mvtnorm)}
 
 # Rosenzweig–MacArthur model with fixed point ------------------------------
 if (func_name == "rosenzweig_macarthur_2sp_fixed_point") {
@@ -106,6 +111,21 @@ if (func_name == "rosenzweig_macarthur_2sp_limit_cycle") {
   sample_size <- 20
 }
 
+# Stochastic Rosenzweig–MacArthur model with limit cycle ------------------------------
+if (func_name == "rosenzweig_macarthur_2sp_limit_cycle_stochastic") {
+  time_type <- "continuous"
+  n_sp <- 2
+  func <- rosenzweig_macarthur_2sp_sde
+  parms <- c(r = 5, k = 1.8, a = 1.3, b = 1, e = 0.7, d = 0.2, s1 = 0.04, s2 = 0.04)
+  state <- c(x1 = 0.51113819, x2 = 4.905690)
+  n_recurrences <- 10
+  n_points <- 100000
+  time_step <- 8.5 / n_points # dominant period divided by n_points
+  times <- seq(0, time_step * n_points * n_recurrences, by = time_step)
+  lim_x1 <- c(0, 1.15)
+  lim_x2 <- c(2.4, 5.7)
+}
+
 # Hastings-Powell model with limit cycle and time-varying attack rate ------------------------------
 if (func_name == "hastings_powell_3sp_forced_cycle") {
   time_type <- "continuous"
@@ -146,6 +166,25 @@ if (func_name == "hastings_powell_3sp_chaos") {
   lim_x2 <- c(0.1, 0.6)
   lim_x3 <- c(0.5, 1.1)
   sample_size <- 20
+}
+
+# Stochastic Hastings-Powell model with chaotic attractor ------------------------------
+if (func_name == "hastings_powell_3sp_chaos_stochastic") {
+  time_type <- "continuous"
+  n_sp <- 3
+  func <- hastings_powell_3sp_sde
+  parms <- c(k = 0.99, a1 = 0.8036, b1 = 0.16129,
+             e1 = 1, d1 = 0.4, a2 = 0.23008, 
+             b2 = 0.5, e2 = 1, d2 = 0.08,
+             s1 = 0.01, s2 = 0.01, s3 = 0.01)
+  state <- c(x1 = 0.2445642, x2 = 0.2500377, x3 = 0.8477652)
+  n_recurrences <- 10
+  n_points <- 100000
+  time_step <- 42 / n_points # dominant period divided by n_points
+  times <- seq(0, time_step * n_points * n_recurrences, by = time_step)
+  lim_x1 <- c(0.15, 0.95)
+  lim_x2 <- c(0.1, 0.6)
+  lim_x3 <- c(0.55, 1.15)
 }
 
 # Discrete-time predator-prey model with limit cycle ------------------------------
