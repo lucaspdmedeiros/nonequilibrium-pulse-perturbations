@@ -3,269 +3,354 @@
 # cleaning environment and loading functions ------------------------------ 
 rm(list = ls(all = TRUE))
 source("code/functions/rosenzweig_macarthur_2sp_ode.R")
-source("code/functions/power_spectrum.R")
+source("code/functions/rosenzweig_macarthur_2sp_sde.R")
+source("code/functions/hastings_powell_3sp_ode.R")
+source("code/functions/hastings_powell_3sp_sde.R")
+source("code/functions/regularized_smap_fit.R")
+source("code/functions/regularized_smap_forecast.R")
+source("code/functions/regularized_smap_cv.R")
 
 # settings ------------------------------
-# to reproduce results 
-set.seed(42)
 # whether to save plots
 save_plots <- TRUE
 # model to use
-func_name <- "rosenzweig_macarthur_2sp_limit_cycle"
+func_name <- "rosenzweig_macarthur_2sp_limit_cycle_stochastic"
 # load model settings
 source("code/scripts/settings.R")
-# whether to run analysis or just load saved results
-run_analysis <- FALSE
-# modify parameter and simulation settings
-time_type <- "continuous"
-n_sp <- 2
-func <- rosenzweig_macarthur_2sp_ode
-A <- 0
-p <- 0.1
-a <- 1.3
-b <- 1
-e <- 0.7
-d <- 0.2
-k_hopf <- (-b * (d + a * e) / (d - a * e))
-state <- c(x1 = 0.5, x2 = 4.0)
-lim_r <- c(1, 21)
-lim_k <- c(0.25, 2.95)
+# to reproduce results 
+seed <- 10
+set.seed(seed)
+julia <- julia_setup()
+julia_command("using Random")
+julia_command(paste("Random.seed!(", seed, ")", sep = ""))
 # species labels
 sp_names <- paste("x", 1:n_sp, sep = "")
 # number of points to use for analysis
-sample_size <- 200
-# color palette
-palette <- colorRampPalette(brewer.pal(11, "RdYlBu"))(sample_size)
-# set of parameters to perform analysis
-k_list <- seq(0.4, 2.8, by = 0.2)
-r_list <- seq(2, 20, by = 1.5)
-param_list <- expand.grid(k_list, r_list)
-# covariance matrix to use
-Sigma <- diag(rep(1, n_sp))
+sample_size <- 150
+# amount of observational noise
+obs_noise <- 0.1
+# time step used in the S-map
+delta_t <- 1
+# whether we use abundance or growth rate as response variable in the S-map
+response <- "continuous_growth_rate"
 
-# compute equilibrium and non-equilibrium metrics for a set of parameter values ------------------------------
-if (run_analysis) {
-  # to store stability metrics for equilibrium point
-  stability_eq_df <- data.frame()
-  # to store stability metrics for non-equilibrium trajectory
-  stability_noneq_df <- data.frame()
-  # loop over parameter values
-  for (i in 1:nrow(param_list)) {
-    print(i)
-    # current parameters and equilibrium point
-    k_mean <- param_list[i, 1]
-    r <- param_list[i, 2]
-    parms <- c(A = A, p = p, r = r, k_mean = k_mean, a = a, b = b, e = e, d = d)
-    equilibrium <- c(x1 = - (b * d) / (d - a * e), x2 = - (b * e * (b * d + d * k_mean - a * e * k_mean) * r) / 
-                       (k_mean * (d - a * e)^2))
-    if (any(equilibrium < 0)) {
-      print("Unfeasible equilibrium")
-    }
-    # compute stability metrics at the equilibrium point
-    curr_state <- as.numeric(equilibrium)
-    names(curr_state) <- sp_names
-    # define time to evolve perturbations
-    tau_eq <- 1.5
-    # compute Jacobian and stability metrics
-    J <- jacobian.full(y = curr_state, func = func, parms = parms)
-    Phi <- expm(tau_eq * J)
-    max_eigen <- max(Re(eigen(J)$values))
-    min_singular <- min(Re(eigen(Phi %*% t(Phi))$values))
-    max_singular <- max(Re(eigen(Phi %*% t(Phi))$values))
-    min_growth_rate <- log(min_singular) / (2 * tau_eq)
-    max_growth_rate <- log(max_singular) / (2 * tau_eq)
-    expect_avg_growth_rate <- (log(sum(diag(Phi %*% Sigma %*% t(Phi)))) - log(sum(diag(Sigma)))) / (2 * tau_eq)
-    # save results
-    curr_stability_eq_df <- data.frame(k = k_mean,
-                                       r = r,
-                                       x1 = as.numeric(equilibrium[1]),
-                                       x2 = as.numeric(equilibrium[2]),
-                                       max_eigen = max_eigen,
-                                       min_growth_rate = min_growth_rate,
-                                       max_growth_rate = max_growth_rate,
-                                       expect_avg_growth_rate = expect_avg_growth_rate)
-    stability_eq_df <- rbind(stability_eq_df, curr_stability_eq_df)
-    # compute stability metrics for the non-equilibrium trajectory
-    if (k_mean > k_hopf) {
-      # define time steps
-      n_points <- 500000
-      time_step <- 0.001
-      times <- seq(0, time_step * n_points, by = time_step)
-      # generate time series
-      ts <- as.data.frame(ode(y = state, times = times, func = func, parms = parms, method = "ode45"))
-      ts <- ts[seq(1, nrow(ts), by = 1000), ]
-      # dominant period
-      dom_period <- round(power_spectrum(ts[ , c(1, 2)], lam = 0.01, scale = TRUE, trim = TRUE, plot = FALSE)[[2]][2], 1)
-      # redefine time points
-      n_recurrences <- 2
-      n_points <- 10000
-      time_step <- dom_period / n_points
-      times <- seq(0, time_step * n_points * n_recurrences, by = time_step)
-      # extract last point
-      curr_state <- as.numeric(ts[nrow(ts), -1])
-      names(curr_state) <- sp_names
-      # generate time series with initial condition on limit cycle
-      ts <- as.data.frame(ode(y = curr_state, times = times, func = func, parms = parms, method = "ode45"))
-      ts$time <- ts$time - ts$time[1]
-      # subset of points to store results
-      n_points_keep <- floor(nrow(ts) * ((n_recurrences - 1) / n_recurrences))
-      ts_sub <- head(ts, n_points_keep)[floor(seq(1, n_points_keep, length = sample_size)), ]
-      # compute Jacobian matrix along trajectory
-      J <- dlply(ts, "time", function(x) jacobian.full(y = unlist(c(x[2:(n_sp + 1)])), 
-                                                       func = func,
+# generate non-perturbed abundance trajectory ------------------------------
+# generate time series
+ts <- func(state = state, p = parms, times = times)
+# subset of points to store results
+ts_sub <- ts[floor(seq(1, nrow(ts), length = sample_size)), ]
+
+# compute analytical Jacobian matrix using ODE without process noise ------------------------------
+if (func_name == "rosenzweig_macarthur_2sp_limit_cycle_stochastic") {
+  # parameter values
+  parms <- c(A = 0, p = 0, r = 5, k_mean = 1.8, a = 1.3, b = 1, e = 0.7, d = 0.2)
+  # compute Jacobian
+  J <- dlply(ts_sub, "time", function(x) jacobian.full(y = unlist(c(x[2:(n_sp + 1)])), 
+                                                       func = rosenzweig_macarthur_2sp_ode,
                                                        parms = parms))
-      # rename Jacobian matrices
-      names(J) <- sprintf("%.5f", ts$time)
-      tau <- ts$time[which.min(abs(ts$time - tau_eq))]
-      # compute stability metrics along trajectory
-      max_eigen <- c()
-      min_growth_rate <- c() 
-      max_growth_rate <- c() 
-      expect_avg_growth_rate <- c()
-      for (j in 1:nrow(ts_sub)) {
-        curr_time <- ts_sub$time[j]
-        curr_state <- as.numeric(ts_sub[j, sp_names])
-        names(curr_state) <- sp_names
-        J_curr <- J[sprintf("%.5f", seq(curr_time, (curr_time + tau), by = time_step))]
-        Phi <- Reduce("%*%", rev(lapply(J_curr, function(A) expm(time_step * A))))
-        max_eigen[j] <- max(Re(eigen(Phi)$values))
-        min_singular <- min(Re(eigen(Phi %*% t(Phi))$values))
-        max_singular <- max(Re(eigen(Phi %*% t(Phi))$values))
-        min_growth_rate[j] <- log(min_singular) / (2 * tau)
-        max_growth_rate[j] <- log(max_singular) / (2 * tau)
-        expect_avg_growth_rate[j] <- (log(sum(diag(Phi %*% Sigma %*% t(Phi)))) - log(sum(diag(Sigma)))) / (2 * tau)
+}
+if (func_name == "hastings_powell_3sp_chaos_stochastic") {
+  # parameter values
+  parms <- c(r = 0, k = 0.99, a1 = 0.8036, a2_base = 0.23008, 
+             e1 = 1, e2 = 1, b1 = 0.16129, b2 = 0.5, d1 = 0.4, d2 = 0.08)
+  # compute Jacobian
+  J <- dlply(ts_sub, "time", function(x) jacobian.full(y = unlist(c(x[2:(n_sp + 1)])), 
+                                                       func = hastings_powell_3sp_ode,
+                                                       parms = parms))
+}
+names(J) <- sprintf("%.5f", ts_sub$time)
+# remove last Jacobian (cannot be inferred from time-series data)
+J <- J[-length(J)]
+
+# add observational noise to time series ------------------------------
+ts_noise <- ts_sub
+if (obs_noise > 0) {
+  for (i in 1:n_sp) {
+    for (j in 1:nrow(ts_noise)) {
+      noisy_abund <- ts_noise[j, i+1] + rnorm(n = 1, mean = 0, sd = sd(ts_noise[ , i+1]) * obs_noise)
+      while (noisy_abund < 0) {
+        noisy_abund <- ts_noise[j, i+1] + rnorm(n = 1, mean = 0, sd = sd(ts_noise[ , i+1]) * obs_noise)
       }
-      # save results
-      curr_stability_noneq_df <- data.frame(k = k_mean,
-                                            r = r,
-                                            x1 = ts_sub$x1,
-                                            x2 = ts_sub$x2,
-                                            max_eigen = max_eigen,
-                                            min_growth_rate = min_growth_rate,
-                                            max_growth_rate = max_growth_rate,
-                                            expect_avg_growth_rate = expect_avg_growth_rate)
-      stability_noneq_df <- rbind(stability_noneq_df, curr_stability_noneq_df, rep(NA, ncol(curr_stability_noneq_df)))
+      ts_noise[j, i+1] <- noisy_abund
     }
   }
-  # save results
-  write.csv(x = stability_eq_df, file = "tables/stability_eq_df.csv", row.names = FALSE)
-  write.csv(x = stability_noneq_df, file = "tables/stability_noneq_df.csv", row.names = FALSE)
-} else {
-  # load results from previous analysis
-  stability_eq_df <- read.csv(file = "tables/stability_eq_df.csv")
-  stability_noneq_df <- read.csv(file = "tables/stability_noneq_df.csv")
 }
+ts_noise$time <- 0:(nrow(ts_noise)-1)
 
-# plot median perturbation growth rate for each parameter combination  ------------------------------
-# compute maximum median perturbation growth rate along nonequilibrium trajectory
-summ_stability_noneq_df <- ddply(stability_noneq_df, c("k", "r"), summarise,
-                                 max_expect_avg_growth_rate = max(expect_avg_growth_rate))
-# define axis limits for plots
-axis_edge_eq <- max(abs(c(min(subset(stability_eq_df, k < k_hopf)$expect_avg_growth_rate, na.rm = TRUE), 
-                          max(subset(stability_eq_df, k < k_hopf)$expect_avg_growth_rate, na.rm = TRUE))))
-axis_edge_noneq <- max(abs(c(min(subset(summ_stability_noneq_df, k > k_hopf)$max_expect_avg_growth_rate, na.rm = TRUE), 
-                             max(subset(summ_stability_noneq_df, k > k_hopf)$max_expect_avg_growth_rate, na.rm = TRUE))))
-# plot for equilibrium case
-fig <- ggplot(data = subset(stability_eq_df, k < k_hopf), aes(x = k, y = r, fill = expect_avg_growth_rate)) +
-  geom_tile() +
-  scale_fill_gradientn(colors = brewer.pal(11, "RdYlBu"), 
-                       limits = c(-axis_edge_eq, axis_edge_eq)) +
-  geom_vline(xintercept = k_hopf, size = 1, linetype = "dashed") +
-  scale_x_continuous(limits = lim_k, expand = c(0, 0)) +
-  scale_y_continuous(limits = lim_r, expand = c(0, 0)) +
-  xlab("K") +
-  ylab("r") +
+# plot abundance time series ------------------------------ 
+# define color palette
+if (n_sp == 2) {
+  palette <- brewer.pal(9, "Set1")[c(3, 4)]
+}
+if (n_sp == 3) {
+  palette <- brewer.pal(9, "Set1")[c(3, 4, 2)]
+}
+# data frame for plotting
+plot_df <- gather(ts_noise, "species", "abundance", -time)
+# plot species abundances through time
+fig <- ggplot() +
+  geom_line(data = plot_df, aes(x = time, y = abundance, color = species), 
+            size = 0.5) +
+  geom_point(data = plot_df, aes(x = time, y = abundance, fill = species), 
+             size = 2.5, shape = 21) +
+  geom_line(size = 0.4) +
+  geom_point(size = 1.5) +
+  scale_color_manual(values = palette) +
+  scale_fill_manual(values = palette) +
+  xlab("Time") +
+  ylab("Species\nabundances") +
   theme_bw() +
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
-        axis.text.y = element_text(size = 14),
-        axis.title = element_text(size = 20),
-        axis.text.x = element_text(size = 14),
-        plot.margin = margin(0.5, 0.5, 0.5, 0.5, "cm"),
-        legend.position = "top",
-        legend.title = element_blank(),
-        legend.text = element_text(size = 14),
-        legend.key.width = unit(1.2, "cm"),
-        legend.key.height = unit(0.8, "cm"))
+        panel.border = element_rect(size = 1),
+        axis.text.y = element_text(size = 12),
+        axis.title = element_text(size = 16),
+        axis.text.x = element_text(size = 12),
+        legend.position = "none")
 if (save_plots) {
-  ggsave(paste("figs/", func_name, "_median_growth_rate_eq_many_k_and_r", ".pdf", sep = ""), 
-         fig, width = 15, height = 15, units = "cm")
+  ggsave(paste("figs/", func_name, "_time_series_abundances.pdf", sep = ""), 
+         fig, width = 17, height = 6, units = "cm")
 }
-# plot for nonequilibrium case
-fig <- ggplot(data = subset(summ_stability_noneq_df, k > k_hopf), aes(x = k, y = r, fill = max_expect_avg_growth_rate)) +
-  geom_tile() +
-  scale_fill_gradientn(colors = brewer.pal(11, "RdYlBu"), 
-                        limits = c(-axis_edge_noneq, axis_edge_noneq)) +
-  geom_vline(xintercept = k_hopf, size = 1, linetype = "dashed") +
-  scale_x_continuous(limits = lim_k, expand = c(0, 0)) +
-  scale_y_continuous(limits = lim_r, expand = c(0, 0)) +
-  xlab("K") +
-  ylab("r") +
+
+# plot attractor in state space ------------------------------ 
+if (n_sp == 2) {
+  fig <- ggplot() +
+    geom_path(data = ts_noise, aes(x = x1, y = x2), size = 0.5, color = "gray70") +
+    geom_point(data = ts_noise, aes(x = x1, y = x2), size = 3, fill = "gray70", shape = 21) +
+    xlab(latex2exp::TeX("Resource abundance ($N_1$)")) +
+    ylab(latex2exp::TeX("Consumer abundance ($N_2$)")) +
+    scale_x_continuous(limits = lim_x1) +
+    scale_y_continuous(limits = lim_x2) +
+    theme_bw() +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.border = element_rect(size = 1.5),
+          axis.text.y = element_text(size = 14),
+          axis.title = element_text(size = 18),
+          axis.text.x = element_text(size = 14),
+          plot.margin = margin(0.5, 0.5, 0.5, 0.5, "cm"),
+          legend.title = element_blank(),
+          legend.text = element_text(size = 14),
+          legend.key.size = unit(0.5, "cm"))
+  if (save_plots) {
+    ggsave(paste("figs/", func_name, "_trajectory_state_space.pdf", sep = ""), 
+           fig, width = 9, height = 9, units = "cm")
+  }
+}
+if (n_sp == 3) {
+  fig <- plot_ly(x = ~x1, y = ~x2, z = ~x3, showlegend = FALSE) %>% 
+    add_markers(data = ts_noise, type = 'scatter3d', color = I('gray70'),
+                marker = list(size = 10)) %>% 
+    add_trace(data = ts_noise, type = 'scatter3d', mode = "lines",
+              color = I('gray70'), line = list(width = 2)) %>% 
+    layout(scene = list(xaxis = list(title = "",
+                                     titlefont = list(size = 28, 
+                                                      family = "Arial, sans-serif"),
+                                     tickfont = list(size = 18,
+                                                     family = "Arial, sans-serif"),
+                                     range = lim_x1,
+                                     ticklen = 6,
+                                     gridwidth = 1.2,
+                                     zerolinewidth = 0,
+                                     showgrid = FALSE, 
+                                     showline = TRUE),
+                        yaxis = list(title = "",
+                                     titlefont = list(size = 28, 
+                                                      family = "Arial, sans-serif"),
+                                     tickfont = list(size = 18,
+                                                     family = "Arial, sans-serif"),
+                                     range = lim_x2,
+                                     ticklen = 6,
+                                     gridwidth = 1.2,
+                                     zerolinewidth = 0,
+                                     showgrid = FALSE, 
+                                     showline = TRUE),
+                        zaxis = list(title = "",
+                                     titlefont = list(size = 28, 
+                                                      family = "Arial, sans-serif"),
+                                     tickfont = list(size = 18,
+                                                     family = "Arial, sans-serif"),
+                                     range = lim_x3,
+                                     ticklen = 6,
+                                     gridwidth = 1.2,
+                                     zerolinewidth = 0,
+                                     showgrid = FALSE, 
+                                     showline = TRUE),
+                        camera = list(eye = list(x = 1.8, y = 0.8, z = 1)),
+                        aspectratio = list(x = 0.8, y = 0.8, z = 0.8)),
+           margin = list(l = 0,
+                         r = 0,
+                         b = 0,
+                         t = 0))
+  if (save_plots) {
+    orca(fig, paste("figs/", func_name, "_trajectory_state_space.pdf", sep = ""), 
+         format = "pdf", width = 800, height = 600)
+  }
+}
+
+# perform out-of-sample predictions to define S-map settings/hyperparameters ------------------------------
+# size of training set
+training_frac <- 0.5
+# training and test sets
+last_train_point <- floor(nrow(ts_noise) * training_frac)
+training_ts <- ts_noise[1:last_train_point, ]
+test_ts <- ts_noise[(last_train_point+1):nrow(ts_noise), ] 
+# hyperparameters
+theta <- c(0, 0.001, 0.01, 0.1, 0.5, 1, 2, 3, 4, 5, 6, 7, 8)
+alpha <- c(0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1)
+lambda <- c(0, 0.001, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5)
+df_hyperparameters <- expand_grid(theta, alpha, lambda)
+# fit S-map and perform forecasts for a grid of hyperparameters
+mean_R2 <- pbmapply(regularized_smap_cv, theta = df_hyperparameters$theta, 
+                    alpha = df_hyperparameters$alpha, lambda = df_hyperparameters$lambda,
+                    MoreArgs = list(training_ts = training_ts, test_ts = test_ts, response = response, 
+                                    delta_t = delta_t, method = "glmnet", scale = TRUE, output = "mean_R2"))
+df_hyperparameters$mean_R2 <- mean_R2
+# order data frame according to R2
+df_hyperparameters <- df_hyperparameters[order(df_hyperparameters$mean_R2, decreasing = TRUE), ]
+# removing cases with negative R2
+df_hyperparameters <- df_hyperparameters[df_hyperparameters$mean_R2 > 0, ]
+# compute cumulative percent change in R2
+R2_diff <- -c(diff(as.numeric(df_hyperparameters$mean_R2)), NA)
+R2_perc_diff <- R2_diff / as.numeric(df_hyperparameters$mean_R2)
+df_hyperparameters$R2_cum_perc_diff <- cumsum(R2_perc_diff)
+# data frame of equivalently optimal R2 values (within 1% of highest R2)
+df_hyperparameters_equivalent <- 
+  df_hyperparameters[which(df_hyperparameters$R2_cum_perc_diff < 0.01), ]
+# order new data frame according to theta, lambda, and alpha
+df_hyperparameters_equivalent <- df_hyperparameters_equivalent[order(df_hyperparameters_equivalent$theta,
+                                                                     df_hyperparameters_equivalent$lambda,
+                                                                     df_hyperparameters_equivalent$alpha), ]
+# select best hyperparameters
+theta <- df_hyperparameters_equivalent$theta[1]
+alpha <- df_hyperparameters_equivalent$alpha[1]
+lambda <- df_hyperparameters_equivalent$lambda[1]
+
+# fit S-map to infer Jacobian matrices over time with selected hyperparameters ------------------------------ 
+# whether to transform estimated S-map coefficients
+if (response == "abundance") {
+  structure_transform <- "none"
+}
+if ((response == "continuous_growth_rate") | (response == "discrete_growth_rate")) {
+  structure_transform <- "model_prediction"
+}
+# fit S-map
+smap_results <- regularized_smap_fit(ts = ts_noise, points = 1:(nrow(ts_noise)-1), theta = theta, alpha = alpha, 
+                                     lambda = lambda, response = response, delta_t = delta_t, method = "glmnet", 
+                                     scale = TRUE, structure_transform = structure_transform)
+smap_J <- smap_results[[1]]
+# compute correlation between true and inferred Jacobian matrix at all times
+cor_list <- c()
+for (i in 1:(nrow(ts_noise)-1)) {
+  cor_list[i] <- cor(c(J[[i]]), c(smap_J[[i]]), use = "complete.obs")
+}
+
+# plot true and inferred Jacobian elements through time ------------------------------ 
+# create data frame from list of matrices
+smap_J_df <- data.frame(matrix(unlist(smap_J), nrow = length(smap_J), byrow = TRUE))
+names(smap_J_df) <- apply(expand.grid(1:n_sp, 1:n_sp), 1, 
+                          function(x) paste("j", paste(x, collapse = ""), sep = "_"))
+J_df <- data.frame(matrix(unlist(J), nrow = length(J), byrow = TRUE))
+names(J_df) <- apply(expand.grid(1:n_sp, 1:n_sp), 1, 
+                     function(x) paste("j", paste(x, collapse = ""), sep = "_"))
+# add time
+smap_J_df$time <- ts_noise$time[-nrow(ts_noise)]
+smap_J_df$type <- "Inferred"
+J_df$time <- ts_noise$time[-nrow(ts_noise)]
+J_df$type <- "True"
+# merge data frames to plot
+both_J_df <- rbind(smap_J_df, J_df)
+# data frame for plotting
+plot_df <- gather(both_J_df, "coefficient", "value", -c(time, type))
+plot_df$type <- factor(plot_df$type, levels = c("True", "Inferred"))
+# plot coefficients through time
+fig <- ggplot(data = plot_df, aes(x = time, y = value, color = type)) +
+  geom_hline(yintercept = 0, size = 0.5, linetype = "dashed") +
+  geom_line(size = 0.7) +
+  facet_wrap(~coefficient) +
+  scale_color_brewer(palette = "Set2") +
+  xlab("Time") +
+  ylab("Jacobian element value") +
   theme_bw() +
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
-        axis.text.y = element_text(size = 14),
+        panel.border = element_rect(size = 0.5),
+        strip.text = element_text(size = 16),
+        strip.background = element_rect(fill = "white", size = 0.5),
+        axis.text.y = element_text(size = 12),
         axis.title = element_text(size = 20),
-        axis.text.x = element_text(size = 14),
-        plot.margin = margin(0.5, 0.5, 0.5, 0.5, "cm"),
+        axis.text.x = element_text(size = 12),
         legend.position = "top",
         legend.title = element_blank(),
-        legend.text = element_text(size = 14),
-        legend.key.width = unit(1.2, "cm"),
-        legend.key.height = unit(0.8, "cm"))
-if (save_plots) {
-  ggsave(paste("figs/", func_name, "_median_growth_rate_noneq_many_k_and_r", ".pdf", sep = ""), 
-         fig, width = 15, height = 15, units = "cm")
-}
+        legend.text = element_text(size = 18),
+        legend.key.size = unit(0.6, "cm"))
 
-# plot nonequilibrium trajectories colored by median perturbation growth rate ------------------------------
-# unstable equilibrium point for k = 1.8
-equilibrium_df <- data.frame(x1 = - (b * d) / (d - a * e), 
-                             x2 = - (b * e * (b * d + d * 1.8 - a * e * 1.8) * 5) / 
-                               (1.8 * (d - a * e)^2))
-# plot for k = 1.8
-fig <- ggplot() +
-  geom_point(data = equilibrium_df, aes(x = x1, y = x2), fill = "gray70", size = 5, shape = 21) +
-  geom_point(data = subset(stability_noneq_df, round(k, 1) == 1.8 & round(r, 1) == 5.0), 
-             aes(x = x1, y = x2, color = expect_avg_growth_rate), size = 5) +
-  scale_color_gradientn(colors = brewer.pal(11, "RdYlBu"), 
-                        limits = c(-axis_edge_noneq, axis_edge_noneq)) +
-  xlab(latex2exp::TeX("Resource abundance")) +
-  ylab(latex2exp::TeX("Consumer abundance")) +
-  theme_classic() +
-  theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.text.y = element_text(size = 17),
-        axis.title = element_text(size = 20),
-        axis.text.x = element_text(size = 17),
-        plot.margin = margin(0.5, 0.5, 0.5, 0.5, "cm"),
-        legend.position = "none")
-if (save_plots) {
-  ggsave(paste("figs/", func_name, "_trajectory_median_growth_rate_noneq_k_1.8", ".pdf", sep = ""), 
-         fig, width = 9, height = 9, units = "cm")
+# compute stability metrics from Jacobian matrices ------------------------------ 
+# determine time scale
+tau <- 10
+# data frames to store results
+results_analytical_df <- data.frame(time = ts_noise$time, 
+                                    max_growth_rate = rep(NA, nrow(ts_noise)),
+                                    median_growth_rate = rep(NA, nrow(ts_noise)),
+                                    type = "True")
+results_smap_df <- data.frame(time = ts_noise$time, 
+                              max_growth_rate = rep(NA, nrow(ts_noise)),
+                              median_growth_rate = rep(NA, nrow(ts_noise)),
+                              type = "Inferred")
+# compute stability metrics at each point in time
+for (t in 1:(nrow(ts_noise)-tau)) {
+  # compute stability metrics using analytical Jacobian
+  J_curr <- J[t:(t+tau-1)]
+  Phi <- Reduce("%*%", rev(lapply(J_curr, function(A) expm(delta_t * A))))
+  singular_phi <- svd(Phi)$d
+  max_growth_rate <- log(max(singular_phi)) / tau
+  median_growth_rate <- log(sum(diag(Phi %*% t(Phi))) / n_sp) / (2 * tau)
+  results_analytical_df[t, "max_growth_rate"] <- max_growth_rate
+  results_analytical_df[t, "median_growth_rate"] <- median_growth_rate
+  # compute stability metrics using Jacobian inferred with S-map
+  smap_J_curr <- smap_J[t:(t+tau-1)]
+  if ((response == "abundance") | (response == "discrete_growth_rate")) {
+    smap_Phi <- Reduce("%*%", rev(lapply(smap_J_curr, function(A) A)))
+  }
+  if (response == "continuous_growth_rate") {
+    smap_Phi <- Reduce("%*%", rev(lapply(smap_J_curr, function(A) expm(delta_t * A))))
+  }
+  smap_singular_phi <- svd(smap_Phi)$d
+  smap_max_growth_rate <- log(max(smap_singular_phi)) / tau
+  smap_median_growth_rate <- log(sum(diag(smap_Phi %*% t(smap_Phi))) / n_sp) / (2 * tau)
+  results_smap_df[t, "max_growth_rate"] <- smap_max_growth_rate
+  results_smap_df[t, "median_growth_rate"] <- smap_median_growth_rate
 }
-# unstable equilibrium point for k = 2.6
-equilibrium_df <- data.frame(x1 = - (b * d) / (d - a * e), 
-                             x2 = - (b * e * (b * d + d * 2.6 - a * e * 2.6) * 17) / 
-                               (2.6 * (d - a * e)^2))
-# plot for k = 2.6
+# correlation between inferred and true stability metrics
+cor(results_smap_df$median_growth_rate, results_analytical_df$median_growth_rate, 
+    use = "complete.obs")
+
+# plot time series of true and inferred stability metrics ------------------------------ 
+# data frame for plotting
+plot_df <- rbind(results_analytical_df, results_smap_df)
+plot_df$type <- factor(plot_df$type, levels = c("True", "Inferred"))
+# plot median perturbation growth rate through time
 fig <- ggplot() +
-  geom_point(data = equilibrium_df, aes(x = x1, y = x2), fill = "gray70", size = 5, shape = 21) +
-  geom_point(data = subset(stability_noneq_df, round(k, 1) == 2.6 & round(r, 1) == 17.0), 
-             aes(x = x1, y = x2, color = expect_avg_growth_rate), size = 5) +
-  scale_color_gradientn(colors = brewer.pal(11, "RdYlBu"), 
-                        limits = c(-axis_edge_noneq, axis_edge_noneq)) +
-  xlab(latex2exp::TeX("Resource abundance")) +
-  ylab(latex2exp::TeX("Consumer abundance")) +
-  theme_classic() +
+  geom_hline(yintercept = 0, size = 0.5) +
+  geom_line(data = plot_df, aes(x = time, y = median_growth_rate, color = type), 
+            size = 0.5) +
+  geom_point(data = plot_df, aes(x = time, y = median_growth_rate, fill = type), 
+             size = 2.5, shape = 21) +
+  scale_color_manual(values = c("gray70", "black")) +
+  scale_fill_manual(values = c("gray70", "black")) +
+  xlab("Time") +
+  ylab("Median perturbation\ngrowth rate") +
+  theme_bw() +
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
-        axis.text.y = element_text(size = 17),
-        axis.title = element_text(size = 20),
-        axis.text.x = element_text(size = 17),
-        plot.margin = margin(0.5, 0.5, 0.5, 0.5, "cm"),
-        legend.position = "none")
+        panel.border = element_rect(size = 1),
+        axis.text.y = element_text(size = 12),
+        axis.title = element_text(size = 15),
+        axis.text.x = element_text(size = 12),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 15),
+        legend.key.size = unit(0.6, "cm"))
 if (save_plots) {
-  ggsave(paste("figs/", func_name, "_trajectory_median_growth_rate_noneq_k_2.6", ".pdf", sep = ""), 
-         fig, width = 9, height = 9, units = "cm")
+  ggsave(paste("figs/", func_name, "_time_series_median_pert_growth_rate.pdf", sep = ""), 
+         fig, width = 21, height = 6, units = "cm")
 }
