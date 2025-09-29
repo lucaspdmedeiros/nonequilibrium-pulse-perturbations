@@ -130,9 +130,9 @@ if (fig_type == "single") {
 if (fig_type == "multiple") {
   sim_results_df$Perturbation <- as.factor(sim_results_df$perturbation)
   fig <- ggplot() +
+    geom_path(data = sim_results_df, aes(x = x1, y = x2, color = Perturbation), size = 1) +
     geom_point(data = plot_df, aes(x = x1, y = x2), fill = "gray70", size = 5, shape = 21) +
     geom_point(data = subset(sim_results_df, time == 0), aes(x = x1, y = x2), fill = "gray70", size = 2, shape = 21) +
-    geom_path(data = sim_results_df, aes(x = x1, y = x2, color = Perturbation), size = 1) +
     xlab(latex2exp::TeX("Resource abundance ($N_1$)")) +
     ylab(latex2exp::TeX("Consumer abundance ($N_2$)")) +
     scale_x_continuous(limits = lim_x1) +
