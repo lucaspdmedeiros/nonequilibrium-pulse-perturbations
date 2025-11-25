@@ -21,7 +21,7 @@ sp_names <- paste("x", 1:n_sp, sep = "")
 pert_sampling <- "uniform"
 # times to store analytical results
 select_times <- times_pert[floor(seq(11, length(times_pert), length = sample_size))]
-# factor to multiply time_step (set to 500 to test for a large time step, Fig. SX)
+# factor to multiply time_step (set to 500 to test for a large time step, Fig. S4)
 time_step_factor <- 1
 # alternative select times
 if (time_step_factor > 1) {
@@ -34,7 +34,7 @@ palette_2 <- c(brewer.pal(9, "Blues")[5], brewer.pal(9, "YlOrRd")[2],
                brewer.pal(9, "Reds")[5])
 # number of points to use for analysis
 sample_size <- 50 * 2^n_sp
-# perturbation magnitude
+# perturbation magnitude (set to 0.2 to test for a large perturbation, Fig. S2)
 pert_magn <- 0.05
 
 # generate non-perturbed abundance trajectory ------------------------------
@@ -52,10 +52,8 @@ if (func_name == "hastings_powell_3sp_forced_cycle") {
 }
 
 # compute Jacobian matrix along trajectory ------------------------------
-J <- dlply(ts, "time", function(x) jacobian.full(y = unlist(c(x[2:(n_sp + 1)])), 
-                                                 func = func,
-                                                 parms = parms))
-if (func_name == "rosenzweig_macarthur_2sp_forced_fixed_point") {
+if ((func_name == "rosenzweig_macarthur_2sp_forced_fixed_point") | 
+    (func_name == "rosenzweig_macarthur_2sp_limit_cycle")) {
   J <- list()
   x1 <- ts$x1
   x2 <- ts$x2
@@ -64,6 +62,24 @@ if (func_name == "rosenzweig_macarthur_2sp_forced_fixed_point") {
                        - (a * x1[i]) / (b + x1[i]),
                        (e * a * x2[i] * (b + x1[i]) - e * a * x1[i] * x2[i]) / (b + x1[i])^2, 
                        ((e * a * x1[i]) / (b + x1[i])) - d), nrow = 2, byrow = TRUE)
+  }
+}
+if ((func_name == "hastings_powell_3sp_forced_cycle") |
+    (func_name == "hastings_powell_3sp_chaos")) {
+  J <- list()
+  x1 <- ts$x1
+  x2 <- ts$x2
+  x3 <- ts$x3
+  for (i in 1:nrow(ts)) {
+    J[[i]] <- matrix(c((1 - (x1[i] / k)) - x1[i] * (1 / k) - (a1 * x2[i] / (x1[i] + b1) - (a1 * x1[i] * x2[i]) / (x1[i] + b1)^2),
+                       -(a1 * x1[i] / (x1[i] + b1)),
+                       0,
+                       a1 * e1 * x2[i] / (x1[i] + b1) - (a1 * e1 * x1[i] * x2[i]) / (x1[i] + b1)^2,
+                       a1 * e1 * x1[i] / (x1[i] + b1) - d1 - (a2[i] * x3[i] / (x2[i] + b2) - (a2[i] * x2[i] * x3[i]) / (x2[i] + b2)^2),
+                       -(a2[i] * x2[i] / (x2[i] + b2)),
+                       0,
+                       a2[i] * e2 * x3[i] / (x2[i] + b2) - (a2[i] * e2 * x2[i] * x3[i]) / (x2[i] + b2)^2,
+                       a2[i] * e2 * x2[i] / (x2[i] + b2) - d2), nrow = 3, byrow = TRUE)
   }
 }
 names(J) <- sprintf("%.5f", ts$time)
