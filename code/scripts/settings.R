@@ -131,8 +131,18 @@ if (func_name == "hastings_powell_3sp_forced_cycle") {
   time_type <- "continuous"
   n_sp <- 3
   func <- hastings_powell_3sp_ode
-  parms <- c(r = 0.000048, k = 0.99, a1 = 0.8036, a2_base = 0.1984, 
-             e1 = 1, e2 = 1, b1 = 0.16129, b2 = 0.5, d1 = 0.4, d2 = 0.08)
+  r <- 0.000048
+  k <- 0.99
+  a1 <- 0.8036
+  a2_base <- 0.1984
+  e1 <- 1
+  e2 <- 1
+  b1 <- 0.16129
+  b2 <- 0.5
+  d1 <- 0.4
+  d2 <- 0.08
+  parms <- c(r = r, k = k, a1 = a1, a2_base = a2_base, 
+             e1 = e1, e2 = e2, b1 = b1, b2 = b2, d1 = d1, d2 = d2)
   state <- c(x1 = 0.6538001, x2 = 0.3563991, x3 = 0.9953945)
   n_recurrences <- 8
   n_points <- 10000
@@ -152,8 +162,18 @@ if (func_name == "hastings_powell_3sp_chaos") {
   time_type <- "continuous"
   n_sp <- 3
   func <- hastings_powell_3sp_ode
-  parms <- c(r = 0, k = 0.99, a1 = 0.8036, a2_base = 0.23008, 
-             e1 = 1, e2 = 1, b1 = 0.16129, b2 = 0.5, d1 = 0.4, d2 = 0.08)
+  r <- 0
+  k <- 0.99
+  a1 <- 0.8036
+  a2_base <- 0.23008
+  e1 <- 1
+  e2 <- 1
+  b1 <- 0.16129
+  b2 <- 0.5
+  d1 <- 0.4
+  d2 <- 0.08
+  parms <- c(r = r, k = k, a1 = a1, a2_base = a2_base, 
+             e1 = e1, e2 = e2, b1 = b1, b2 = b2, d1 = d1, d2 = d2)
   state <- c(x1 = 0.2445642, x2 = 0.2500377, x3 = 0.8477652)
   n_recurrences <- 10
   n_points <- 10000
@@ -161,7 +181,7 @@ if (func_name == "hastings_powell_3sp_chaos") {
   times <- seq(0, time_step * n_points * n_recurrences, by = time_step)
   time_step_pert <- time_step
   times_pert <- seq(0, time_step_pert * n_points, by = time_step_pert)
-  a2 <- parms[6] + parms[1] * times
+  a2 <- parms[4] + parms[1] * times
   lim_x1 <- c(0.1, 0.95)
   lim_x2 <- c(0.1, 0.6)
   lim_x3 <- c(0.5, 1.1)
