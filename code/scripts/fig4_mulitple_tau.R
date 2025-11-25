@@ -18,10 +18,8 @@ full_results_df <- data.frame()
 tau_list <- seq(0.1, 1, by = 0.1)
 # to reproduce results 
 set.seed(42)
-# whether to save plots
-save_plots <- FALSE
 # whether to run analysis or just load saved results
-run_analysis <- FALSE
+run_analysis <- TRUE
 
 # perform analysis for each model ------------------------------
 if (run_analysis) {
@@ -46,18 +44,34 @@ if (run_analysis) {
     ts_sub <- head(ts, n_points_keep)[floor(seq(1, n_points_keep, length = sample_size)), ]
     
     # compute Jacobian matrix along trajectory ------------------------------
-    J <- dlply(ts, "time", function(x) jacobian.full(y = unlist(c(x[2:(n_sp + 1)])), 
-                                                     func = func,
-                                                     parms = parms))
-    if (func_name == "rosenzweig_macarthur_2sp_forced_fixed_point") {
+    if ((func_name == "rosenzweig_macarthur_2sp_forced_fixed_point") | 
+        (func_name == "rosenzweig_macarthur_2sp_limit_cycle")) {
       J <- list()
       x1 <- ts$x1
       x2 <- ts$x2
-      for (i in 1:nrow(ts)) {
-        J[[i]] <- matrix(c(r - ((2 * r * x1[i]) / k[i]) - ((a * x2[i] * (b + x1[i]) - a * x1[i] * x2[i]) / (b + x1[i])^2), 
-                           - (a * x1[i]) / (b + x1[i]),
-                           (e * a * x2[i] * (b + x1[i]) - e * a * x1[i] * x2[i]) / (b + x1[i])^2, 
-                           ((e * a * x1[i]) / (b + x1[i])) - d), nrow = 2, byrow = TRUE)
+      for (j in 1:nrow(ts)) {
+        J[[j]] <- matrix(c(r - ((2 * r * x1[j]) / k[j]) - ((a * x2[j] * (b + x1[j]) - a * x1[j] * x2[j]) / (b + x1[j])^2), 
+                           - (a * x1[j]) / (b + x1[j]),
+                           (e * a * x2[j] * (b + x1[j]) - e * a * x1[j] * x2[j]) / (b + x1[j])^2, 
+                           ((e * a * x1[j]) / (b + x1[j])) - d), nrow = 2, byrow = TRUE)
+      }
+    }
+    if ((func_name == "hastings_powell_3sp_forced_cycle") |
+        (func_name == "hastings_powell_3sp_chaos")) {
+      J <- list()
+      x1 <- ts$x1
+      x2 <- ts$x2
+      x3 <- ts$x3
+      for (j in 1:nrow(ts)) {
+        J[[j]] <- matrix(c((1 - (x1[j] / k)) - x1[j] * (1 / k) - (a1 * x2[j] / (x1[j] + b1) - (a1 * x1[j] * x2[j]) / (x1[j] + b1)^2),
+                           -(a1 * x1[j] / (x1[j] + b1)),
+                           0,
+                           a1 * e1 * x2[j] / (x1[j] + b1) - (a1 * e1 * x1[j] * x2[j]) / (x1[j] + b1)^2,
+                           a1 * e1 * x1[j] / (x1[j] + b1) - d1 - (a2[j] * x3[j] / (x2[j] + b2) - (a2[j] * x2[j] * x3[j]) / (x2[j] + b2)^2),
+                           -(a2[j] * x2[j] / (x2[j] + b2)),
+                           0,
+                           a2[j] * e2 * x3[j] / (x2[j] + b2) - (a2[j] * e2 * x2[j] * x3[j]) / (x2[j] + b2)^2,
+                           a2[j] * e2 * x2[j] / (x2[j] + b2) - d2), nrow = 3, byrow = TRUE)
       }
     }
     names(J) <- sprintf("%.5f", ts$time)
