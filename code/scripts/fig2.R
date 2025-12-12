@@ -12,9 +12,9 @@ set.seed(42)
 fig_type <- "single"
 # whether to save plots
 save_plots <- TRUE
-# model to use
+# scenario to use (this analysis is performed only for this scenario)
 func_name <- "rosenzweig_macarthur_2sp_limit_cycle"
-# load model settings
+# load scenario settings
 source("code/scripts/settings.R")
 # species labels
 sp_names <- paste("x", 1:n_sp, sep = "")

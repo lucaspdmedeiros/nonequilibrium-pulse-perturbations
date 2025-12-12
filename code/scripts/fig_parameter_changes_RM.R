@@ -11,9 +11,9 @@ source("code/functions/power_spectrum.R")
 set.seed(42)
 # whether to save plots
 save_plots <- TRUE
-# model to use
+# scenario to use (this analysis is performed only for this scenario)
 func_name <- "rosenzweig_macarthur_2sp_limit_cycle"
-# load model settings
+# load scenario settings
 source("code/scripts/settings.R")
 # whether to run analysis or just load saved results
 run_analysis <- FALSE

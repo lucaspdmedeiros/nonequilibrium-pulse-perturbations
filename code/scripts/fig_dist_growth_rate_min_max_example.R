@@ -10,11 +10,9 @@ source("code/functions/hypersphere_sampling.R")
 # settings ------------------------------
 # to reproduce results 
 set.seed(42)
-# whether to save plots
-save_plots <- FALSE
-# model to use
+# scenario to use (this analysis is performed only for this scenario)
 func_name <- "hastings_powell_3sp_chaos"
-# load model settings
+# load scenario settings
 source("code/scripts/settings.R")
 # species labels
 sp_names <- paste("x", 1:n_sp, sep = "")
@@ -45,23 +43,6 @@ if (func_name == "rosenzweig_macarthur_2sp_forced_fixed_point") {
 if (func_name == "hastings_powell_3sp_forced_cycle") {
   a2_sub <- head(a2, n_points_keep)[floor(seq(1, n_points_keep, length = sample_size))]
 }
-
-# compute Jacobian matrix along trajectory ------------------------------
-J <- dlply(ts, "time", function(x) jacobian.full(y = unlist(c(x[2:(n_sp + 1)])), 
-                                                 func = func,
-                                                 parms = parms))
-if (func_name == "rosenzweig_macarthur_2sp_forced_fixed_point") {
-  J <- list()
-  x1 <- ts$x1
-  x2 <- ts$x2
-  for (i in 1:nrow(ts)) {
-    J[[i]] <- matrix(c(r - ((2 * r * x1[i]) / k[i]) - ((a * x2[i] * (b + x1[i]) - a * x1[i] * x2[i]) / (b + x1[i])^2), 
-                       - (a * x1[i]) / (b + x1[i]),
-                       (e * a * x2[i] * (b + x1[i]) - e * a * x1[i] * x2[i]) / (b + x1[i])^2, 
-                       ((e * a * x1[i]) / (b + x1[i])) - d), nrow = 2, byrow = TRUE)
-  }
-}
-names(J) <- sprintf("%.5f", ts$time)
 
 # sample perturbation directions ------------------------------
 pert_size_init <- pert_magn * mean(apply(ts[ , sp_names], 2, sd))

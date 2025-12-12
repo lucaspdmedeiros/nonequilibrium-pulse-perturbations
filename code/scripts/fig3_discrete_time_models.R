@@ -11,9 +11,11 @@ source("code/functions/hypersphere_sampling.R")
 set.seed(42)
 # whether to save plots
 save_plots <- TRUE
-# model to use
+# there are 2 possible scenarios to use for func_name: 
+# 1) predator_prey_2sp_limit_cycle
+# 2) larvae_pupae_adults_3sp_chaos 
 func_name <- "predator_prey_2sp_limit_cycle"
-# load model settings
+# load scenario settings
 source("code/scripts/settings.R")
 # species labels
 sp_names <- paste("x", 1:n_sp, sep = "")

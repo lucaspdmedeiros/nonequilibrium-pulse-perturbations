@@ -1,5 +1,6 @@
 # Numerically integrates a stochastic version of the 
 # Rosenzweig–MacArthur 2-species consumer-resource model
+# (model modified from Bieg et al 2023 Proc R Soc B)
 
 # Arguments:
 # state: vector of initial abundances

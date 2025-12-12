@@ -13,9 +13,11 @@ source("code/functions/regularized_smap_cv.R")
 # settings ------------------------------
 # whether to save plots
 save_plots <- TRUE
-# model to use
+# there are 2 possible scenarios to use for func_name: 
+# 1) rosenzweig_macarthur_2sp_limit_cycle_stochastic
+# 2) hastings_powell_3sp_chaos_stochastic 
 func_name <- "rosenzweig_macarthur_2sp_limit_cycle_stochastic"
-# load model settings
+# load scenario settings
 source("code/scripts/settings.R")
 # to reproduce results 
 seed <- 10

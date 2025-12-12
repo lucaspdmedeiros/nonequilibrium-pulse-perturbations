@@ -1,5 +1,5 @@
-# Iterates the discrete-time Larvae-Pupae-Adults (LPA) model
-# (model from Costantino et al 1997 Science)
+# Iterates the discrete-time Larvae-Pupae-Adults (LPA)
+# model from Costantino et al 1997 Science
 
 # Arguments:
 # t_max: number of time steps

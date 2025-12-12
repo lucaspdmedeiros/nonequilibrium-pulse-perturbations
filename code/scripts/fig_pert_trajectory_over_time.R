@@ -12,9 +12,13 @@ source("code/functions/hypersphere_sampling.R")
 set.seed(42)
 # whether to save plots
 save_plots <- TRUE
-# model to use
-func_name <- "rosenzweig_macarthur_2sp_limit_cycle"
-# load model settings
+# there are 4 possible scenarios to use for func_name: 
+# 1) rosenzweig_macarthur_2sp_forced_fixed_point
+# 2) rosenzweig_macarthur_2sp_limit_cycle 
+# 3) hastings_powell_3sp_forced_cycle
+# 4) hastings_powell_3sp_chaos
+func_name <- "rosenzweig_macarthur_2sp_forced_fixed_point"
+# load scenarios settings
 source("code/scripts/settings.R")
 # species labels
 sp_names <- paste("x", 1:n_sp, sep = "")

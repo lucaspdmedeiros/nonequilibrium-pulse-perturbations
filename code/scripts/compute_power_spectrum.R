@@ -1,5 +1,5 @@
-# Computes the power spectrum for a population dynamics model 
-# from time series generate from the model
+# Computes the power spectrum for a population dynamics model from time series 
+# generated from the model (code adapted from Rogers et al 2023 Ecol Lett)
 
 # cleaning wd, loading functions and packages ------------------------------ 
 rm(list = ls(all = TRUE))
@@ -24,13 +24,11 @@ if (!require(gifski)) {install.packages("gifski"); library(gifski)}
 # settings ------------------------------
 # to reproduce results 
 set.seed(42)
-# whether to save plots
-save_plots <- FALSE
 # species to use
 species <- "x1"
 # sampling frequency
 sampling_freq <- 1000
-# model to use
+# scenario to use (rosenzweig_macarthur_2sp_limit_cycle or hastings_powell_3sp_chaos)
 func_name <- "rosenzweig_macarthur_2sp_limit_cycle"
 # Rosenzweig–MacArthur model with limit cycle
 if (func_name == "rosenzweig_macarthur_2sp_limit_cycle") {

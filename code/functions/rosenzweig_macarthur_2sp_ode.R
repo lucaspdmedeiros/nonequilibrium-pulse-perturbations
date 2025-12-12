@@ -1,6 +1,6 @@
 # Returns the rates of change for the Rosenzweig–MacArthur 2-species
 # consumer-resource model with time-varying carrying capacity 
-# (model from Bieg et al 2023 Proc R Soc B)
+# (model modified from Bieg et al 2023 Proc R Soc B)
 
 # Arguments:
 # t: vector of time steps

@@ -7,7 +7,7 @@ source("code/functions/rosenzweig_macarthur_2sp_ode.R")
 source("code/functions/hastings_powell_3sp_ode.R")
 
 # settings ------------------------------
-# models to use
+# scenarios to use
 func_names <- c("rosenzweig_macarthur_2sp_forced_fixed_point",
                 "rosenzweig_macarthur_2sp_limit_cycle",
                 "hastings_powell_3sp_forced_cycle",
@@ -21,15 +21,15 @@ set.seed(42)
 # whether to run analysis or just load saved results
 run_analysis <- TRUE
 
-# perform analysis for each model ------------------------------
+# perform analysis for each scenario ------------------------------
 if (run_analysis) {
   for (i in 1:length(func_names)) {
     # data frame to store results
     results_df <- data.frame()
-    # current model
+    # current scenario
     func_name <- func_names[i]
     print(func_name)
-    # load model settings
+    # load scenario settings
     source("code/scripts/settings.R")
     # species labels
     sp_names <- paste("x", 1:n_sp, sep = "")
@@ -122,11 +122,11 @@ if (run_analysis) {
 }
 
 # plots of how expected and maximum growth rate change with tau  ------------------------------
-# compute maximum perturbation growth rate under for each combination of model and tau
+# compute maximum perturbation growth rate under for each combination of scenario and tau
 summ_results_df <- ddply(full_results_df, c("tau", "model"), summarise,
                          max_max_growth_rate = max(max_growth_rate),
                          max_expect_avg_growth_rate = max(expect_avg_growth_rate))
-# rescale maximum expected growth rate by the maximum within each model
+# rescale maximum expected growth rate by the maximum within each scenario
 summ_summ_results_df <- ddply(summ_results_df, c("model"), summarise,
                               max_expect_avg_growth_rate = max_expect_avg_growth_rate / max(max_expect_avg_growth_rate))
 summ_summ_results_df$tau <- tau_list
@@ -154,7 +154,7 @@ fig <- ggplot() +
         legend.text = element_text(size = 12),
         legend.key.width = unit(1, "cm"),
         legend.key.height = unit(0.8, "cm"))
-# rescale maximum maximum growth rate by the maximum within each model
+# rescale maximum maximum growth rate by the maximum within each scenario
 summ_summ_results_df <- ddply(summ_results_df, c("model"), summarise,
                               max_max_growth_rate = max_max_growth_rate / max(max_max_growth_rate))
 summ_summ_results_df$tau <- tau_list

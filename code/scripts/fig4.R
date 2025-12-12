@@ -10,9 +10,13 @@ source("code/functions/hastings_powell_3sp_ode.R")
 set.seed(42)
 # whether to save plots
 save_plots <- TRUE
-# model to use
+# there are 4 possible scenarios to use for func_name: 
+# 1) rosenzweig_macarthur_2sp_forced_fixed_point
+# 2) rosenzweig_macarthur_2sp_limit_cycle 
+# 3) hastings_powell_3sp_forced_cycle
+# 4) hastings_powell_3sp_chaos
 func_name <- "rosenzweig_macarthur_2sp_forced_fixed_point"
-# load model settings
+# load scenario settings
 source("code/scripts/settings.R")
 # species labels
 sp_names <- paste("x", 1:n_sp, sep = "")
@@ -23,11 +27,11 @@ palette <- colorRampPalette(brewer.pal(11, "RdYlBu"))(sample_size)
 # percentage of recurrence time to evolve perturbations (set to 0.2 or 0.8 to produce other plots in Fig 4)
 perc_rec_time <- 0.02
 tau <- time_step * n_points * perc_rec_time
-# which stability metric to use 
-# expect_avg_growth_rate for Fig 4 
-# max_growth_rate for Fig S9 
-# max_growth_rate_eigen for Fig S10
-# expect_inst_growth_rate for Fig S11
+# which stability metric to use: 
+# - expect_avg_growth_rate for Fig 4 
+# - max_growth_rate for Fig S9 
+# - max_growth_rate_eigen for Fig S10
+# - expect_inst_growth_rate for Fig S11
 metric <- "expect_avg_growth_rate"
 
 # generate non-perturbed abundance trajectory ------------------------------
