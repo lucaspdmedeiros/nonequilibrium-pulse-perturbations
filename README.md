@@ -1,6 +1,6 @@
 # A nonequilibrium framework for community responses to pulse perturbations
 
-This repository contains the codes associated with the following manuscript: Medeiros, L. P, Neubert, M. G., Sosik, H. M., and Munch, S. B. (2025). A nonequilibrium framework for community responses to pulse perturbations.
+This repository contains the codes associated with the following manuscript: Medeiros, L. P, Neubert, M. G., Sosik, H. M., and Munch, S. B. (2026). A nonequilibrium framework for community responses to pulse perturbations. *Ecology Letters*.
 
 In this study, we introduce a unified framework to quantify the minimum, typical, and maximum growth rate of pulse perturbations under nonequilibrium population dynamics.
 
